@@ -97,17 +97,20 @@ training_op = optimizer.minimize(loss)
 
 init = tf.global_variables_initializer()
 
-n_iterations = 1000
-batch_size = 100
+n_epoch = 20
+batch_size = 50
+n_batches = np.size(spike_train,0)//batch_size
 
 with tf.Session() as sess:
     init.run()
-    for iteration in range(n_iterations):
-        X_batch, y_batch = next_batch(batch_size, spike_train, kin_p_train)
-        sess.run(training_op, feed_dict={X: X_batch, y: y_batch})
-        if iteration % 100 == 0:
-            mse = loss.eval(feed_dict={X: X_batch, y: y_batch})
-            print(iteration, "\tMSE:", mse)
+    for epoch in range(n_epoch):
+        print(epoch)
+        for iteration in range(n_batches):
+            X_batch, y_batch = next_batch(batch_size, spike_train, kin_p_train)
+            sess.run(training_op, feed_dict={X: X_batch, y: y_batch})
+        if epoch % 2 == 0:
+           mse = loss.eval(feed_dict={X: X_batch, y: y_batch})
+           print(epoch, "\tMSE:", mse)
     
     y_pred = sess.run(outputs, feed_dict={X: spike_test})
 res = r2_score(kin_p_test, y_pred)
@@ -115,8 +118,8 @@ print(res)
 #%%
 import matplotlib.pyplot as plt
 plt.figure(1)
-plt.plot(kin_p_test[0:200,0],'b')
-plt.plot(y_pred[0:200,0],'r')
+plt.plot(kin_p_test[200:560,0],'b')
+plt.plot(y_pred[200:560,0],'r')
 
 
 
