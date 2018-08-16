@@ -13,18 +13,6 @@ from sklearn.metrics import r2_score
 
 import nexfile
 from my_nex_class import my_nex_class
-file_name = "Z:/data/Greyson_17L2/NeuroexplorerFile/20180813_Greyson_PG_001.nex5"
-reader = nexfile.Reader(useNumpy=True)
-data = reader.ReadNex5File(file_name)
-myNex = my_nex_class(file_name)
-spike_data = myNex.grab_spike_data()
-spike_names = myNex.grab_spike_names()
-cont_data = myNex.grab_cont_data()
-cont_names = myNex.grab_cont_names()
-firing_rate = myNex.bin_spike_data(0.05)
-spike = myNex.smooth_firing_rate(firing_rate, 0.05)
-kin_p = myNex.cont_downsample(1/0.05)
-#kin_p = force[:,0] - force[:,1]
 
 def get_one_minute_data(bin_size,start_min,X,y):
     start_ind = int(np.floor(start_min*60/bin_size))
@@ -59,6 +47,28 @@ def next_batch(batch_size, X, y):
 
 def reconstruct_vaf(y, y_hat):
     return 1 - np.sum((y-y_hat)**2)/np.sum((y - np.mean(y, axis = 0))**2)
+
+def get_data(file_name):
+    reader = nexfile.Reader(useNumpy=True)
+    data = reader.ReadNex5File(file_name)
+    myNex = my_nex_class(file_name)
+    spike_data = myNex.grab_spike_data()
+    spike_names = myNex.grab_spike_names()
+    cont_data = myNex.grab_cont_data()
+    cont_names = myNex.grab_cont_names()
+    firing_rate = myNex.bin_spike_data(0.05)
+    spike = myNex.smooth_firing_rate(firing_rate, 0.05)
+    kin_p = myNex.cont_downsample(1/0.05)
+    return spike, kin_p
+    
+
+file_name1 = "Z:/data/Greyson_17L2/NeuroexplorerFile/20180813_Greyson_PG_001.nex5"
+file_name2 = "Z:/data/Greyson_17L2/NeuroexplorerFile/20180813_Greyson_PG_002.nex5"
+file_name3 = "Z:/data/Greyson_17L2/NeuroexplorerFile/20180813_Greyson_PG_003.nex5"
+
+spike1, kin_p1 = get_data(file_name1)
+spike2, kin_p2 = get_data(file_name2)
+spike3, kin_p3 = get_data(file_name3)
 #%%
 from sklearn.preprocessing import MinMaxScaler
 tf.reset_default_graph() 
@@ -67,25 +77,25 @@ n_inputs = 96
 n_neurons = n_inputs
 n_outputs = 1
 
-spike_train, kin_p_train = get_n_minute_data(0.05,0,12,spike,kin_p)
+spike_train, kin_p_train = get_n_minute_data(0.05,0,10,spike3,kin_p3)
 spike_train, kin_p_train = form_rnn_data(spike_train, kin_p_train, 10)
 kin_p_train = kin_p_train[:,0] - kin_p_train[:,1]
 kin_p_train = kin_p_train.reshape((np.size(kin_p_train,0),1))
 scaler = MinMaxScaler()
 kin_p_train = scaler.fit_transform(kin_p_train)
 
-spike_test, kin_p_test = get_n_minute_data(0.05,12,15,spike,kin_p)
+spike_test, kin_p_test = get_n_minute_data(0.05,10,15,spike3,kin_p3)
 spike_test, kin_p_test = form_rnn_data(spike_test, kin_p_test, 10)
 kin_p_test = kin_p_test[:,0] - kin_p_test[:,1]
 kin_p_test = kin_p_test.reshape((np.size(kin_p_test,0),1))
-kin_p_test = scaler.transform(kin_p_test)
+kin_p_test = scaler.fit_transform(kin_p_test)
 
 X = tf.placeholder(tf.float64, [None, n_steps, n_inputs])
 y = tf.placeholder(tf.float64, [None, n_outputs])    
-cell = tf.contrib.rnn.BasicRNNCell(num_units=n_neurons, activation=tf.nn.relu)
+basic_cell = tf.contrib.rnn.BasicRNNCell(num_units=n_neurons, activation=tf.nn.relu)
 lstm_cell = tf.contrib.rnn.LSTMCell(num_units=n_neurons)
 gru_cell = tf.contrib.rnn.GRUCell(num_units=n_neurons)
-rnn_outputs, states = tf.nn.dynamic_rnn(lstm_cell, X, dtype=tf.float64)
+rnn_outputs, states = tf.nn.dynamic_rnn(gru_cell, X, dtype=tf.float64)
 out_temp = rnn_outputs[:, n_steps-1, :]
 learning_rate = 0.001
 
@@ -97,7 +107,7 @@ training_op = optimizer.minimize(loss)
 
 init = tf.global_variables_initializer()
 
-n_epoch = 20
+n_epoch = 8
 batch_size = 50
 n_batches = np.size(spike_train,0)//batch_size
 
@@ -112,18 +122,37 @@ with tf.Session() as sess:
            mse = loss.eval(feed_dict={X: X_batch, y: y_batch})
            print(epoch, "\tMSE:", mse)
     
-    y_pred = sess.run(outputs, feed_dict={X: spike_test})
-res = r2_score(kin_p_test, y_pred)
-print(res)
+    y_pred_gru = sess.run(outputs, feed_dict={X: spike_test})
+res_gru = r2_score(kin_p_test, y_pred_gru)
+print(res_gru)
 #%%
 import matplotlib.pyplot as plt
 plt.figure(1)
-plt.plot(kin_p_test[200:560,0],'b')
-plt.plot(y_pred[200:560,0],'r')
+plt.plot(kin_p_test[200:700,0],'b')
+plt.plot(y_pred_basic[200:700,0],'r')
+#%%
+plt.figure(1)
+fig,ax = plt.subplots(figsize = (10,4),dpi = 100)
 
+#plt.ylim(60,73)  
+#plt.xlim(0, 34)
 
+plt.subplots_adjust(bottom = 0.15)  
 
+t = np.arange(0,400,1)  
+ax.set_title('Decoding grasping force from cortical signals (Greyson)',fontsize=14)
+#plt.xticks(t*0.05)
+plt.grid()
 
+ax.set_xlabel(xlabel='time (s)',fontsize=12)
+ax.set_ylabel(ylabel='force', fontsize = 12)
+
+p1, = plt.plot(t*0.05,kin_p_test[300:700], 'k-')
+p2, = plt.plot(t*0.05,y_pred_basic[300:700], 'b-')
+#p3 = plt.plot(t*0.05,y_pred_lstm[200:700], 'r-')
+p4, = plt.plot(t*0.05,y_pred_gru[300:700], 'r-')
+
+l1 = plt.legend([p1, p2, p4], ["Actual", "Basic RNN Cell (VAF = 61.07%)", "LSTM Cell (VAF = 68.15%)"], loc='upper right',fontsize = 10)    
 
 
 
