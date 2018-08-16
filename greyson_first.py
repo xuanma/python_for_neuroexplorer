@@ -92,10 +92,13 @@ kin_p_test = scaler.fit_transform(kin_p_test)
 
 X = tf.placeholder(tf.float64, [None, n_steps, n_inputs])
 y = tf.placeholder(tf.float64, [None, n_outputs])    
-basic_cell = tf.contrib.rnn.BasicRNNCell(num_units=n_neurons, activation=tf.nn.relu)
+
+basic_cell = tf.contrib.rnn.BasicRNNCell(num_units=n_neurons, activation=tf.nn.elu)
 lstm_cell = tf.contrib.rnn.LSTMCell(num_units=n_neurons)
 gru_cell = tf.contrib.rnn.GRUCell(num_units=n_neurons)
-rnn_outputs, states = tf.nn.dynamic_rnn(gru_cell, X, dtype=tf.float64)
+
+rnn_outputs, states = tf.nn.dynamic_rnn(basic_cell, X, dtype=tf.float64)
+
 out_temp = rnn_outputs[:, n_steps-1, :]
 learning_rate = 0.001
 
@@ -122,19 +125,20 @@ with tf.Session() as sess:
            mse = loss.eval(feed_dict={X: X_batch, y: y_batch})
            print(epoch, "\tMSE:", mse)
     
-    y_pred_gru = sess.run(outputs, feed_dict={X: spike_test})
-res_gru = r2_score(kin_p_test, y_pred_gru)
-print(res_gru)
+    y_pred_basic = sess.run(outputs, feed_dict={X: spike_test})
+res_basic = r2_score(kin_p_test, y_pred_basic)
+print(res_basic)
 #%%
 import matplotlib.pyplot as plt
 plt.figure(1)
 plt.plot(kin_p_test[200:700,0],'b')
 plt.plot(y_pred_basic[200:700,0],'r')
 #%%
+import matplotlib.pyplot as plt
 plt.figure(1)
 fig,ax = plt.subplots(figsize = (10,4),dpi = 100)
 
-#plt.ylim(60,73)  
+plt.ylim(0,1)  
 #plt.xlim(0, 34)
 
 plt.subplots_adjust(bottom = 0.15)  
@@ -152,7 +156,7 @@ p2, = plt.plot(t*0.05,y_pred_basic[300:700], 'b-')
 #p3 = plt.plot(t*0.05,y_pred_lstm[200:700], 'r-')
 p4, = plt.plot(t*0.05,y_pred_gru[300:700], 'r-')
 
-l1 = plt.legend([p1, p2, p4], ["Actual", "Basic RNN Cell (VAF = 61.07%)", "LSTM Cell (VAF = 68.15%)"], loc='upper right',fontsize = 10)    
+l1 = plt.legend([p1, p2, p4], ["Actual", "Basic RNN Cell ($R^2$ = 0.63)", "GRU Cell ($R^2$ = 0.69)"], loc='upper right',fontsize = 10)    
 
 
 
