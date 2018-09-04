@@ -6,7 +6,8 @@ Created on Thu Jul 19 22:57:08 2018
 """
 import nexfile
 import numpy as np
-import scipy.stats as stats
+from scipy import signal
+from scipy import stats
 
 class my_nex_class:
     def __init__(self, file_name):
@@ -90,19 +91,55 @@ class my_nex_class:
         for i in range(1,int(np.size(data,0)/n)+1):
             new_data = np.vstack((new_data, data[i*n, :]))
         return new_data
+    
+    def EMG_processing(self, EMG_list, output_option = 'filtered'):
+        cont_names = self.grab_cont_names()
+        cont_data = self.grab_cont_data()
+        raw_EMG_data = []
+        filtered_EMG = []
+        EMG_name = []
+        fs = self.cont_var_fs
+        for each in EMG_list:
+            index = cont_names.index(each)
+            raw_EMG_data.append(cont_data[index])
+            EMG_name.append(each)
+        
+        bhigh, ahigh = signal.butter(4,50/(fs/2), 'high')
+        blow, alow = signal.butter(4,10/(fs/2), 'low')
+        for each in raw_EMG_data:
+            temp = signal.filtfilt(bhigh, ahigh, each)
+            f_abs_emg = signal.filtfilt(blow ,alow, np.abs(temp))
+            filtered_EMG.append(f_abs_emg)
+            
+        if output_option == 'raw':
+           return raw_EMG_data
+        else:
+           return filtered_EMG
+       
+    def EMG_downsample(self, new_fs, data):
+        fs = self.cont_var_fs
+        data = np.asarray(data).T
+        n = int(np.floor(fs/new_fs))
+        new_data = np.empty((0, np.size(data,1)))
+        for i in range(1,int(np.size(data,0)/n)+1):
+            new_data = np.vstack((new_data, data[i*n, :]))
+        return new_data
+            
+            
+            
        
     
 
-if __name__ == "__main__":
-   file_name = "Jango_IsoBoxCO_HC_SpikesEMGs_07312015_SN_001.nex5"
-   myNex = my_nex_class(file_name)
-   spike_data = myNex.grab_spike_data()
-   spike_names = myNex.grab_spike_names()
-   cont_data = myNex.grab_cont_data()
-   cont_names = myNex.grab_cont_names()
-   waveforms = myNex.grab_waveform_data()
-   firing_rate = myNex.bin_spike_data(0.05)
-   firing_rate = myNex.smooth_firing_rate(firing_rate, 0.05)
+#if __name__ == "__main__":
+#   file_name = "Jango_IsoBoxCO_HC_SpikesEMGs_07312015_SN_001.nex5"
+#   myNex = my_nex_class(file_name)
+#   spike_data = myNex.grab_spike_data()
+#   spike_names = myNex.grab_spike_names()
+#   cont_data = myNex.grab_cont_data()
+#   cont_names = myNex.grab_cont_names()
+#   waveforms = myNex.grab_waveform_data()
+#   firing_rate = myNex.bin_spike_data(0.05)
+#   firing_rate = myNex.smooth_firing_rate(firing_rate, 0.05)
 
 
 #%%  
